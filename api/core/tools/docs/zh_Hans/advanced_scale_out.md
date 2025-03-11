@@ -21,6 +21,7 @@ Dify支持`文本` `链接` `图片` `文件BLOB` `JSON` 等多种消息类型�
             create an image message
 
             :param image: the url of the image
+            :param save_as: save as
             :return: the image message
         """
 ```
@@ -34,6 +35,7 @@ Dify支持`文本` `链接` `图片` `文件BLOB` `JSON` 等多种消息类型�
             create a link message
 
             :param link: the url of the link
+            :param save_as: save as
             :return: the link message
         """
 ```
@@ -47,6 +49,7 @@ Dify支持`文本` `链接` `图片` `文件BLOB` `JSON` 等多种消息类型�
             create a text message
 
             :param text: the text of the message
+            :param save_as: save as
             :return: the text message
         """
 ```
@@ -55,7 +58,7 @@ Dify支持`文本` `链接` `图片` `文件BLOB` `JSON` 等多种消息类型�
 如果你需要返回文件的原始数据，如图片、音频、视频、PPT、Word、Excel等，可以使用以下接口。
 
 - `blob` 文件的原始数据，bytes类型
-- `meta` 文件的元数据，如果你知道该文件的类型，最好传递一个`mime_type`，否则Dify将使用`octet/stream`作为默认类型
+- `meta` 文件的元数据，如果你知道该文件的类型，最好传递一个`mime_type`，否则Dify将使用`application/octet-stream`作为默认类型
 
 ```python
     def create_blob_message(self, blob: bytes, meta: dict = None, save_as: str = '') -> ToolInvokeMessage:
@@ -63,6 +66,8 @@ Dify支持`文本` `链接` `图片` `文件BLOB` `JSON` 等多种消息类型�
             create a blob message
 
             :param blob: the blob
+            :param meta: meta
+            :param save_as: save as
             :return: the blob message
         """
 ```

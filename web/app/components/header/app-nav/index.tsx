@@ -11,7 +11,7 @@ import {
   RiRobot2Line,
 } from '@remixicon/react'
 import Nav from '../nav'
-import { type NavItem } from '../nav/nav-selector'
+import type { NavItem } from '../nav/nav-selector'
 import { fetchAppList } from '@/service/apps'
 import CreateAppTemplateDialog from '@/app/components/app/create-app-dialog'
 import CreateAppModal from '@/app/components/app/create-app-modal'
@@ -87,8 +87,10 @@ const AppNav = () => {
         })(isCurrentWorkspaceEditor, app)
         return {
           id: app.id,
+          icon_type: app.icon_type,
           icon: app.icon,
           icon_background: app.icon_background,
+          icon_url: app.icon_url,
           name: app.name,
           mode: app.mode,
           link,

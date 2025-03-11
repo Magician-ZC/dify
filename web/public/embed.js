@@ -69,38 +69,57 @@
       iframe.id = iframeId;
       iframe.src = iframeUrl;
       iframe.style.cssText = `
-        border: none; position: fixed; flex-direction: column; justify-content: space-between;
-        box-shadow: rgba(150, 150, 150, 0.2) 0px 10px 30px 0px, rgba(150, 150, 150, 0.2) 0px 0px 0px 1px;
-        bottom: 5rem; right: 1rem; width: 24rem; max-width: calc(100vw - 2rem); height: 40rem;
-        max-height: calc(100vh - 6rem); border-radius: 0.75rem; display: flex; z-index: 2147483647;
-        overflow: hidden; left: unset; background-color: #F3F4F6;
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        left: unset;
+        right: 0;
+        bottom: 0;
+        width: 24rem;
+        max-width: calc(100vw - 2rem);
+        height: 43.75rem;
+        max-height: calc(100vh - 6rem);
+        border: none;
+        z-index: 2147483640;
+        overflow: hidden;
+        user-select: none;
       `;
 
-      document.body.appendChild(iframe);
+      return iframe;
     }
 
     // Function to reset the iframe position
     function resetIframePosition() {
+      if (window.innerWidth <= 640)
+        return
+
       const targetIframe = document.getElementById(iframeId);
       const targetButton = document.getElementById(buttonId);
       if (targetIframe && targetButton) {
         const buttonRect = targetButton.getBoundingClientRect();
-        const buttonBottom = window.innerHeight - buttonRect.bottom;
-        const buttonRight = window.innerWidth - buttonRect.right;
-        const buttonLeft = buttonRect.left;
 
-        // Adjust iframe position to stay within viewport
-        targetIframe.style.bottom = `${
-          buttonBottom + buttonRect.height + 5 + targetIframe.clientHeight > window.innerHeight
-            ? buttonBottom - targetIframe.clientHeight - 5
-            : buttonBottom + buttonRect.height + 5
-        }px`;
+        const buttonInBottom = buttonRect.top - 5 > targetIframe.clientHeight
 
-        targetIframe.style.right = `${
-          buttonRight + targetIframe.clientWidth > window.innerWidth
-            ? window.innerWidth - buttonLeft - targetIframe.clientWidth
-            : buttonRight
-        }px`;
+        if (buttonInBottom) {
+          targetIframe.style.bottom = '0px';
+          targetIframe.style.top = 'unset';
+        }
+        else {
+          targetIframe.style.bottom = 'unset';
+          targetIframe.style.top = '0px';
+        }
+
+        const buttonInRight = buttonRect.right > targetIframe.clientWidth;
+
+        if (buttonInRight) {
+          targetIframe.style.right = '0';
+          targetIframe.style.left = 'unset';
+        }
+        else {
+          targetIframe.style.right = 'unset';
+          targetIframe.style.left = 0;
+        }
       }
     }
 
@@ -139,26 +158,20 @@
           right: var(--${containerDiv.id}-right, 1rem);
           left: var(--${containerDiv.id}-left, unset);
           top: var(--${containerDiv.id}-top, unset);
-          width: var(--${containerDiv.id}-width, 50px);
-          height: var(--${containerDiv.id}-height, 50px);
+          width: var(--${containerDiv.id}-width, 48px);
+          height: var(--${containerDiv.id}-height, 48px);
           border-radius: var(--${containerDiv.id}-border-radius, 25px);
           background-color: var(--${containerDiv.id}-bg-color, #155EEF);
           box-shadow: var(--${containerDiv.id}-box-shadow, rgba(0, 0, 0, 0.2) 0px 4px 8px 0px);
           cursor: pointer;
           z-index: 2147483647;
-          transition: all 0.2s ease-in-out 0s;
-        }
-      `);
-      styleSheet.sheet.insertRule(`
-        #${containerDiv.id}:hover {
-          transform: var(--${containerDiv.id}-hover-transform, scale(1.1));
         }
       `);
 
       // Create display div for the button icon
       const displayDiv = document.createElement("div");
       displayDiv.style.cssText =
-        "display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; z-index: 2147483647;";
+        "position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; z-index: 2147483647;";
       displayDiv.innerHTML = svgIcons.open;
       containerDiv.appendChild(displayDiv);
       document.body.appendChild(containerDiv);
@@ -167,7 +180,7 @@
       containerDiv.addEventListener("click", function () {
         const targetIframe = document.getElementById(iframeId);
         if (!targetIframe) {
-          createIframe();
+          containerDiv.prepend(createIframe());
           resetIframePosition();
           this.title = "Exit (ESC)";
           displayDiv.innerHTML = svgIcons.close;

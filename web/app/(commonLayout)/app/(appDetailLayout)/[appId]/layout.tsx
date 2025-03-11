@@ -15,15 +15,17 @@ import {
 } from '@remixicon/react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
+import { useContextSelector } from 'use-context-selector'
 import s from './style.module.css'
 import cn from '@/utils/classnames'
 import { useStore } from '@/app/components/app/store'
 import AppSideBar from '@/app/components/app-sidebar'
 import type { NavIcon } from '@/app/components/app-sidebar/navLink'
-import { fetchAppDetail } from '@/service/apps'
-import { useAppContext } from '@/context/app-context'
+import { fetchAppDetail, fetchAppSSO } from '@/service/apps'
+import AppContext, { useAppContext } from '@/context/app-context'
 import Loading from '@/app/components/base/loading'
 import useBreakpoints, { MediaType } from '@/hooks/use-breakpoints'
+import type { App } from '@/types/app'
 
 export type IAppDetailLayoutProps = {
   children: React.ReactNode
@@ -40,18 +42,21 @@ const AppDetailLayout: FC<IAppDetailLayoutProps> = (props) => {
   const pathname = usePathname()
   const media = useBreakpoints()
   const isMobile = media === MediaType.mobile
-  const { isCurrentWorkspaceEditor } = useAppContext()
+  const { isCurrentWorkspaceEditor, isLoadingCurrentWorkspace } = useAppContext()
   const { appDetail, setAppDetail, setAppSiderbarExpand } = useStore(useShallow(state => ({
     appDetail: state.appDetail,
     setAppDetail: state.setAppDetail,
     setAppSiderbarExpand: state.setAppSiderbarExpand,
   })))
+  const [isLoadingAppDetail, setIsLoadingAppDetail] = useState(false)
+  const [appDetailRes, setAppDetailRes] = useState<App | null>(null)
   const [navigation, setNavigation] = useState<Array<{
     name: string
     href: string
     icon: NavIcon
     selectedIcon: NavIcon
   }>>([])
+  const systemFeatures = useContextSelector(AppContext, state => state.systemFeatures)
 
   const getNavigations = useCallback((appId: string, isCurrentWorkspaceEditor: boolean, mode: string) => {
     const navs = [
@@ -89,7 +94,7 @@ const AppDetailLayout: FC<IAppDetailLayoutProps> = (props) => {
       },
     ]
     return navs
-  }, [t])
+  }, [])
 
   useEffect(() => {
     if (appDetail) {
@@ -101,27 +106,50 @@ const AppDetailLayout: FC<IAppDetailLayoutProps> = (props) => {
       // if ((appDetail.mode === 'advanced-chat' || appDetail.mode === 'workflow') && (pathname).endsWith('workflow'))
       //   setAppSiderbarExpand('collapse')
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appDetail, isMobile])
 
   useEffect(() => {
     setAppDetail()
+    setIsLoadingAppDetail(true)
     fetchAppDetail({ url: '/apps', id: appId }).then((res) => {
-      // redirections
-      if ((res.mode === 'workflow' || res.mode === 'advanced-chat') && (pathname).endsWith('configuration')) {
-        router.replace(`/app/${appId}/workflow`)
-      }
-      else if ((res.mode !== 'workflow' && res.mode !== 'advanced-chat') && (pathname).endsWith('workflow')) {
-        router.replace(`/app/${appId}/configuration`)
-      }
-      else {
-        setAppDetail(res)
-        setNavigation(getNavigations(appId, isCurrentWorkspaceEditor, res.mode))
-      }
+      setAppDetailRes(res)
     }).catch((e: any) => {
       if (e.status === 404)
         router.replace('/apps')
+    }).finally(() => {
+      setIsLoadingAppDetail(false)
     })
-  }, [appId, isCurrentWorkspaceEditor])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appId, pathname])
+
+  useEffect(() => {
+    if (!appDetailRes || isLoadingCurrentWorkspace || isLoadingAppDetail)
+      return
+    const res = appDetailRes
+    // redirection
+    const canIEditApp = isCurrentWorkspaceEditor
+    if (!canIEditApp && (pathname.endsWith('configuration') || pathname.endsWith('workflow') || pathname.endsWith('logs'))) {
+      router.replace(`/app/${appId}/overview`)
+      return
+    }
+    if ((res.mode === 'workflow' || res.mode === 'advanced-chat') && (pathname).endsWith('configuration')) {
+      router.replace(`/app/${appId}/workflow`)
+    }
+    else if ((res.mode !== 'workflow' && res.mode !== 'advanced-chat') && (pathname).endsWith('workflow')) {
+      router.replace(`/app/${appId}/configuration`)
+    }
+    else {
+      setAppDetail({ ...res, enable_sso: false })
+      setNavigation(getNavigations(appId, isCurrentWorkspaceEditor, res.mode))
+      if (systemFeatures.enable_web_sso_switch_component && canIEditApp) {
+        fetchAppSSO({ appId }).then((ssoRes) => {
+          setAppDetail({ ...res, enable_sso: ssoRes.enabled })
+        })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appDetailRes, isCurrentWorkspaceEditor, isLoadingAppDetail, isLoadingCurrentWorkspace, systemFeatures.enable_web_sso_switch_component])
 
   useUnmount(() => {
     setAppDetail()
@@ -129,18 +157,18 @@ const AppDetailLayout: FC<IAppDetailLayoutProps> = (props) => {
 
   if (!appDetail) {
     return (
-      <div className='flex h-full items-center justify-center bg-white'>
+      <div className='flex h-full items-center justify-center bg-background-body'>
         <Loading />
       </div>
     )
   }
 
   return (
-    <div className={cn(s.app, 'flex', 'overflow-hidden')}>
+    <div className={cn(s.app, 'flex relative', 'overflow-hidden')}>
       {appDetail && (
-        <AppSideBar title={appDetail.name} icon={appDetail.icon} icon_background={appDetail.icon_background} desc={appDetail.mode} navigation={navigation} />
+        <AppSideBar title={appDetail.name} icon={appDetail.icon} icon_background={appDetail.icon_background as string} desc={appDetail.mode} navigation={navigation} />
       )}
-      <div className="bg-white grow overflow-hidden">
+      <div className="bg-components-panel-bg grow overflow-hidden">
         {children}
       </div>
     </div>

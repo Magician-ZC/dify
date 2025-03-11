@@ -9,7 +9,7 @@ import cn from '@/utils/classnames'
 import type { HtmlContentProps } from '@/app/components/base/popover'
 import CustomPopover from '@/app/components/base/popover'
 import Divider from '@/app/components/base/divider'
-import SearchInput from '@/app/components/base/search-input'
+import Input from '@/app/components/base/input'
 import { Tag01, Tag03 } from '@/app/components/base/icons/src/vender/line/financeAndECommerce'
 import type { Tag } from '@/app/components/base/tag-management/constant'
 import Checkbox from '@/app/components/base/checkbox'
@@ -54,7 +54,7 @@ const Panel = (props: PanelProps) => {
     return tagList.filter(tag => tag.type === type && !value.includes(tag.id) && tag.name.includes(keywords))
   }, [type, tagList, value, keywords])
 
-  const [creating, setCreating] = useState<Boolean>(false)
+  const [creating, setCreating] = useState<boolean>(false)
   const createNewTag = async () => {
     if (!keywords)
       return
@@ -68,6 +68,7 @@ const Panel = (props: PanelProps) => {
         ...tagList,
         newTag,
       ])
+      setKeywords('')
       setCreating(false)
       onCreate()
     }
@@ -123,13 +124,17 @@ const Panel = (props: PanelProps) => {
     handleValueChange()
   })
 
-  const onMouseLeave = async () => {
-    props.onClose?.()
-  }
   return (
-    <div className='relative w-full bg-white rounded-lg border-[0.5px] border-gray-200' onMouseLeave={onMouseLeave}>
+    <div className='relative w-full bg-white rounded-lg border-[0.5px] border-gray-200'>
       <div className='p-2 border-b-[0.5px] border-black/5'>
-        <SearchInput placeholder={t('common.tag.selectorPlaceholder') || ''} white value={keywords} onChange={handleKeywordsChange} />
+        <Input
+          showLeftIcon
+          showClearIcon
+          value={keywords}
+          placeholder={t('common.tag.selectorPlaceholder') || ''}
+          onChange={e => handleKeywordsChange(e.target.value)}
+          onClear={() => handleKeywordsChange('')}
+        />
       </div>
       {keywords && notExisted && (
         <div className='p-1'>
@@ -210,6 +215,7 @@ const TagSelector: FC<TagSelectorProps> = ({
 }) => {
   const { t } = useTranslation()
 
+  const tagList = useTagStore(s => s.tagList)
   const setTagList = useTagStore(s => s.setTagList)
 
   const getTagList = async () => {
@@ -219,9 +225,9 @@ const TagSelector: FC<TagSelectorProps> = ({
 
   const triggerContent = useMemo(() => {
     if (selectedTags?.length)
-      return selectedTags.map(tag => tag.name).join(', ')
+      return selectedTags.filter(selectedTag => tagList.find(tag => tag.id === selectedTag.id)).map(tag => tag.name).join(', ')
     return ''
-  }, [selectedTags])
+  }, [selectedTags, tagList])
 
   const Trigger = () => {
     return (

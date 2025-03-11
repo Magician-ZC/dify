@@ -4,15 +4,22 @@ import {
   useWorkflow,
   useWorkflowVariables,
 } from '@/app/components/workflow/hooks'
-import type { ValueSelector, Var } from '@/app/components/workflow/types'
+import type { Node, ValueSelector, Var } from '@/app/components/workflow/types'
 type Params = {
   onlyLeafNodeVar?: boolean
+  hideEnv?: boolean
+  hideChatVar?: boolean
   filterVar: (payload: Var, selector: ValueSelector) => boolean
+  passedInAvailableNodes?: Node[]
 }
 
+// TODO: loop type?
 const useAvailableVarList = (nodeId: string, {
   onlyLeafNodeVar,
   filterVar,
+  hideEnv,
+  hideChatVar,
+  passedInAvailableNodes,
 }: Params = {
   onlyLeafNodeVar: false,
   filterVar: () => true,
@@ -21,7 +28,7 @@ const useAvailableVarList = (nodeId: string, {
   const { getNodeAvailableVars } = useWorkflowVariables()
   const isChatMode = useIsChatMode()
 
-  const availableNodes = onlyLeafNodeVar ? getTreeLeafNodes(nodeId) : getBeforeNodesInSameBranch(nodeId)
+  const availableNodes = passedInAvailableNodes || (onlyLeafNodeVar ? getTreeLeafNodes(nodeId) : getBeforeNodesInSameBranch(nodeId))
 
   const {
     parentNode: iterationNode,
@@ -32,6 +39,8 @@ const useAvailableVarList = (nodeId: string, {
     beforeNodes: availableNodes,
     isChatMode,
     filterVar,
+    hideEnv,
+    hideChatVar,
   })
 
   return {

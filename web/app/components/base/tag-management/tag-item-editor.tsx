@@ -8,7 +8,7 @@ import { useDebounceFn } from 'ahooks'
 import { useContext } from 'use-context-selector'
 import { useTranslation } from 'react-i18next'
 import { useStore as useTagStore } from './store'
-import TagRemoveModal from './tag-remove-modal'
+import Confirm from '@/app/components/base/confirm'
 import cn from '@/utils/classnames'
 import type { Tag } from '@/app/components/base/tag-management/constant'
 import { ToastContext } from '@/app/components/base/toast'
@@ -78,7 +78,7 @@ const TagItemEditor: FC<TagItemEditorProps> = ({
     }
   }
   const [showRemoveModal, setShowRemoveModal] = useState(false)
-  const [pending, setPending] = useState<Boolean>(false)
+  const [pending, setPending] = useState<boolean>(false)
   const removeTag = async (tagID: string) => {
     if (pending)
       return
@@ -134,14 +134,15 @@ const TagItemEditor: FC<TagItemEditorProps> = ({
           />
         )}
       </div>
-      <TagRemoveModal
-        tag={tag}
-        show={showRemoveModal}
+      <Confirm
+        title={`${t('common.tag.delete')} "${tag.name}"`}
+        isShow={showRemoveModal}
+        content={t('common.tag.deleteTip')}
         onConfirm={() => {
           handleRemove()
           setShowRemoveModal(false)
         }}
-        onClose={() => setShowRemoveModal(false)}
+        onCancel={() => setShowRemoveModal(false)}
       />
     </>
   )

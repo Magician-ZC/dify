@@ -3,16 +3,12 @@ import type { FC } from 'react'
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useBoolean } from 'ahooks'
-import {
-  RiQuestionLine,
-} from '@remixicon/react'
 import produce from 'immer'
 import { useContext } from 'use-context-selector'
 import ConfirmAddVar from './confirm-add-var'
-import s from './style.module.css'
 import PromptEditorHeightResizeWrap from './prompt-editor-height-resize-wrap'
 import cn from '@/utils/classnames'
-import { type PromptVariable } from '@/models/debug'
+import type { PromptVariable } from '@/models/debug'
 import Tooltip from '@/app/components/base/tooltip'
 import type { CompletionParams } from '@/types/app'
 import { AppType } from '@/types/app'
@@ -30,13 +26,14 @@ import { ADD_EXTERNAL_DATA_TOOL } from '@/app/components/app/configuration/confi
 import { INSERT_VARIABLE_VALUE_BLOCK_COMMAND } from '@/app/components/base/prompt-editor/plugins/variable-block'
 import { PROMPT_EDITOR_UPDATE_VALUE_BY_EVENT_EMITTER } from '@/app/components/base/prompt-editor/plugins/update-block'
 import useBreakpoints, { MediaType } from '@/hooks/use-breakpoints'
+import { useFeaturesStore } from '@/app/components/base/features/hooks'
 
 export type ISimplePromptInput = {
   mode: AppType
   promptTemplate: string
   promptVariables: PromptVariable[]
   readonly?: boolean
-  onChange?: (promp: string, promptVariables: PromptVariable[]) => void
+  onChange?: (prompt: string, promptVariables: PromptVariable[]) => void
   noTitle?: boolean
   gradientBorder?: boolean
   editorHeight?: number
@@ -50,13 +47,17 @@ const Prompt: FC<ISimplePromptInput> = ({
   readonly = false,
   onChange,
   noTitle,
-  gradientBorder,
   editorHeight: initEditorHeight,
   noResize,
 }) => {
   const { t } = useTranslation()
   const media = useBreakpoints()
   const isMobile = media === MediaType.mobile
+  const featuresStore = useFeaturesStore()
+  const {
+    features,
+    setFeatures,
+  } = featuresStore!.getState()
 
   const { eventEmitter } = useEventEmitterContextContext()
   const {
@@ -69,7 +70,6 @@ const Prompt: FC<ISimplePromptInput> = ({
     hasSetBlockStatus,
     showSelectDataSet,
     externalDataToolsConfig,
-    isAgent,
   } = useContext(ConfigContext)
   const { notify } = useToastContext()
   const { setShowExternalDataToolModal } = useModalContext()
@@ -141,32 +141,42 @@ const Prompt: FC<ISimplePromptInput> = ({
     })
     setModelConfig(newModelConfig)
     setPrevPromptConfig(modelConfig.configs)
-    if (mode !== AppType.completion)
+
+    if (mode !== AppType.completion) {
       setIntroduction(res.opening_statement)
+      const newFeatures = produce(features, (draft) => {
+        draft.opening = {
+          ...draft.opening,
+          enabled: !!res.opening_statement,
+          opening_statement: res.opening_statement,
+        }
+      })
+      setFeatures(newFeatures)
+    }
     showAutomaticFalse()
   }
   const minHeight = initEditorHeight || 228
   const [editorHeight, setEditorHeight] = useState(minHeight)
 
   return (
-    <div className={cn((!readonly || gradientBorder) ? `${s.gradientBorder}` : 'bg-gray-50', ' relative shadow-md')}>
-      <div className='rounded-xl bg-[#EEF4FF]'>
+    <div className={cn('relative bg-gradient-to-r from-components-input-border-active-prompt-1 to-components-input-border-active-prompt-2 rounded-xl p-0.5 shadow-xs')}>
+      <div className='rounded-xl bg-background-section-burn'>
         {!noTitle && (
-          <div className="flex justify-between items-center h-11 pl-3 pr-6">
+          <div className="flex justify-between items-center h-11 pl-3 pr-2.5">
             <div className="flex items-center space-x-1">
-              <div className='h2'>{mode !== AppType.completion ? t('appDebug.chatSubTitle') : t('appDebug.completionSubTitle')}</div>
+              <div className='h2 system-sm-semibold-uppercase text-text-secondary'>{mode !== AppType.completion ? t('appDebug.chatSubTitle') : t('appDebug.completionSubTitle')}</div>
               {!readonly && (
                 <Tooltip
-                  htmlContent={<div className='w-[180px]'>
-                    {t('appDebug.promptTip')}
-                  </div>}
-                  selector='config-prompt-tooltip'>
-                  <RiQuestionLine className='w-[14px] h-[14px] text-indigo-400' />
-                </Tooltip>
+                  popupContent={
+                    <div className='w-[180px]'>
+                      {t('appDebug.promptTip')}
+                    </div>
+                  }
+                />
               )}
             </div>
             <div className='flex items-center'>
-              {!isAgent && !readonly && !isMobile && (
+              {!readonly && !isMobile && (
                 <AutomaticBtn onClick={showAutomaticTrue} />
               )}
             </div>
@@ -174,14 +184,14 @@ const Prompt: FC<ISimplePromptInput> = ({
         )}
 
         <PromptEditorHeightResizeWrap
-          className='px-4 pt-2 min-h-[228px] bg-white rounded-t-xl text-sm text-gray-700'
+          className='px-4 pt-2 min-h-[228px] bg-background-default rounded-t-xl text-sm text-text-secondary'
           height={editorHeight}
           minHeight={minHeight}
           onHeightChange={setEditorHeight}
           hideResize={noResize}
           footer={(
-            <div className='pl-4 pb-2 flex bg-white rounded-b-xl'>
-              <div className="h-[18px] leading-[18px] px-1 rounded-md bg-gray-100 text-xs text-gray-500">{promptTemplate.length}</div>
+            <div className='pl-4 pb-2 flex bg-background-default rounded-b-xl'>
+              <div className="h-[18px] leading-[18px] px-1 rounded-md bg-components-badge-bg-gray-soft text-xs text-text-tertiary">{promptTemplate.length}</div>
             </div>
           )}
         >
@@ -243,7 +253,7 @@ const Prompt: FC<ISimplePromptInput> = ({
       {isShowConfirmAddVar && (
         <ConfirmAddVar
           varNameArr={newPromptVariables.map(v => v.name)}
-          onConfrim={handleAutoAdd(true)}
+          onConfirm={handleAutoAdd(true)}
           onCancel={handleAutoAdd(false)}
           onHide={hideConfirmAddVar}
         />

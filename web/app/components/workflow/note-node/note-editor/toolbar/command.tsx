@@ -13,7 +13,7 @@ import {
 import { useStore } from '../store'
 import { useCommand } from './hooks'
 import cn from '@/utils/classnames'
-import TooltipPlus from '@/app/components/base/tooltip-plus'
+import Tooltip from '@/app/components/base/tooltip'
 
 type CommandProps = {
   type: 'bold' | 'italic' | 'strikethrough' | 'link' | 'bullet'
@@ -60,21 +60,23 @@ const Command = ({
   }, [type, t])
 
   return (
-    <TooltipPlus popupContent={tip}>
+    <Tooltip
+      popupContent={tip}
+    >
       <div
         className={cn(
-          'flex items-center justify-center w-8 h-8 cursor-pointer rounded-md text-gray-500 hover:text-gray-800 hover:bg-black/5',
-          type === 'bold' && selectedIsBold && 'bg-primary-50',
-          type === 'italic' && selectedIsItalic && 'bg-primary-50',
-          type === 'strikethrough' && selectedIsStrikeThrough && 'bg-primary-50',
-          type === 'link' && selectedIsLink && 'bg-primary-50',
-          type === 'bullet' && selectedIsBullet && 'bg-primary-50',
+          'flex items-center justify-center w-8 h-8 cursor-pointer rounded-md text-text-tertiary hover:text-text-accent hover:bg-state-accent-active',
+          type === 'bold' && selectedIsBold && 'bg-state-accent-active',
+          type === 'italic' && selectedIsItalic && 'bg-state-accent-active',
+          type === 'strikethrough' && selectedIsStrikeThrough && 'bg-state-accent-active',
+          type === 'link' && selectedIsLink && 'bg-state-accent-active',
+          type === 'bullet' && selectedIsBullet && 'bg-state-accent-active',
         )}
         onClick={() => handleCommand(type)}
       >
         {icon}
       </div>
-    </TooltipPlus>
+    </Tooltip>
   )
 }
 

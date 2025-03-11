@@ -8,20 +8,16 @@ import { v4 as uuidV4 } from 'uuid'
 import { usePathname } from 'next/navigation'
 import { useWorkflowStore } from '../store'
 import { useNodesSyncDraft } from '../hooks'
-import {
-  NodeRunningStatus,
-  WorkflowRunningStatus,
-} from '../types'
+import { WorkflowRunningStatus } from '../types'
 import { useWorkflowUpdate } from './use-workflow-interactions'
+import { useWorkflowRunEvent } from './use-workflow-run-event/use-workflow-run-event'
 import { useStore as useAppStore } from '@/app/components/app/store'
 import type { IOtherOptions } from '@/service/base'
 import { ssePost } from '@/service/base'
-import {
-  fetchPublishedWorkflow,
-  stopWorkflowRun,
-} from '@/service/workflow'
+import { stopWorkflowRun } from '@/service/workflow'
 import { useFeaturesStore } from '@/app/components/base/features/hooks'
 import { AudioPlayerManager } from '@/app/components/base/audio-btn/audio.player.manager'
+import type { VersionHistory } from '@/types/workflow'
 
 export const useWorkflowRun = () => {
   const store = useStoreApi()
@@ -31,6 +27,23 @@ export const useWorkflowRun = () => {
   const { doSyncWorkflowDraft } = useNodesSyncDraft()
   const { handleUpdateWorkflowCanvas } = useWorkflowUpdate()
   const pathname = usePathname()
+  const {
+    handleWorkflowStarted,
+    handleWorkflowFinished,
+    handleWorkflowFailed,
+    handleWorkflowNodeStarted,
+    handleWorkflowNodeFinished,
+    handleWorkflowNodeIterationStarted,
+    handleWorkflowNodeIterationNext,
+    handleWorkflowNodeIterationFinished,
+    handleWorkflowNodeLoopStarted,
+    handleWorkflowNodeLoopNext,
+    handleWorkflowNodeLoopFinished,
+    handleWorkflowNodeRetry,
+    handleWorkflowAgentLog,
+    handleWorkflowTextChunk,
+    handleWorkflowTextReplace,
+  } = useWorkflowRunEvent()
 
   const handleBackupDraft = useCallback(() => {
     const {
@@ -108,6 +121,11 @@ export const useWorkflowRun = () => {
       onIterationStart,
       onIterationNext,
       onIterationFinish,
+      onLoopStart,
+      onLoopNext,
+      onLoopFinish,
+      onNodeRetry,
+      onAgentLog,
       onError,
       ...restCallback
     } = callback || {}
@@ -127,8 +145,6 @@ export const useWorkflowRun = () => {
     if (appDetail?.mode === 'workflow')
       url = `/apps/${appDetail.id}/workflows/draft/run`
 
-    let prevNodeId = ''
-
     const {
       setWorkflowRunningData,
     } = workflowStore.getState()
@@ -139,9 +155,6 @@ export const useWorkflowRun = () => {
       tracing: [],
       resultText: '',
     })
-
-    let isInIteration = false
-    let iterationLength = 0
 
     let ttsUrl = ''
     let ttsIsPublic = false
@@ -155,7 +168,7 @@ export const useWorkflowRun = () => {
       else
         ttsUrl = `/apps/${params.appId}/text-to-audio`
     }
-    const player = AudioPlayerManager.getInstance().getAudioPlayer(ttsUrl, ttsIsPublic, uuidV4(), 'none', 'none', (_: any): any => {})
+    const player = AudioPlayerManager.getInstance().getAudioPlayer(ttsUrl, ttsIsPublic, uuidV4(), 'none', 'none', (_: any): any => { })
 
     ssePost(
       url,
@@ -164,346 +177,140 @@ export const useWorkflowRun = () => {
       },
       {
         onWorkflowStarted: (params) => {
-          const { task_id, data } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          const {
-            edges,
-            setEdges,
-          } = store.getState()
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            draft.task_id = task_id
-            draft.result = {
-              ...draft?.result,
-              ...data,
-              status: WorkflowRunningStatus.Running,
-            }
-          }))
-
-          const newEdges = produce(edges, (draft) => {
-            draft.forEach((edge) => {
-              edge.data = {
-                ...edge.data,
-                _runned: false,
-              }
-            })
-          })
-          setEdges(newEdges)
+          handleWorkflowStarted(params)
 
           if (onWorkflowStarted)
             onWorkflowStarted(params)
         },
         onWorkflowFinished: (params) => {
-          const { data } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-
-          const isStringOutput = data.outputs && Object.keys(data.outputs).length === 1 && typeof data.outputs[Object.keys(data.outputs)[0]] === 'string'
-
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            draft.result = {
-              ...draft.result,
-              ...data,
-            } as any
-            if (isStringOutput) {
-              draft.resultTabActive = true
-              draft.resultText = data.outputs[Object.keys(data.outputs)[0]]
-            }
-          }))
-
-          prevNodeId = ''
+          handleWorkflowFinished(params)
 
           if (onWorkflowFinished)
             onWorkflowFinished(params)
         },
         onError: (params) => {
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            draft.result = {
-              ...draft.result,
-              status: WorkflowRunningStatus.Failed,
-            }
-          }))
+          handleWorkflowFailed()
 
           if (onError)
             onError(params)
         },
         onNodeStarted: (params) => {
-          const { data } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          const {
-            getNodes,
-            setNodes,
-            edges,
-            setEdges,
-            transform,
-          } = store.getState()
-          if (isInIteration) {
-            setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-              const tracing = draft.tracing!
-              const iterations = tracing[tracing.length - 1]
-              const currIteration = iterations.details![iterations.details!.length - 1]
-              currIteration.push({
-                ...data,
-                status: NodeRunningStatus.Running,
-              } as any)
-            }))
-          }
-          else {
-            const nodes = getNodes()
-            setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-              draft.tracing!.push({
-                ...data,
-                status: NodeRunningStatus.Running,
-              } as any)
-            }))
+          handleWorkflowNodeStarted(
+            params,
+            {
+              clientWidth,
+              clientHeight,
+            },
+          )
 
-            const {
-              setViewport,
-            } = reactflow
-            const currentNodeIndex = nodes.findIndex(node => node.id === data.node_id)
-            const currentNode = nodes[currentNodeIndex]
-            const position = currentNode.position
-            const zoom = transform[2]
-
-            if (!currentNode.parentId) {
-              setViewport({
-                x: (clientWidth - 400 - currentNode.width! * zoom) / 2 - position.x * zoom,
-                y: (clientHeight - currentNode.height! * zoom) / 2 - position.y * zoom,
-                zoom: transform[2],
-              })
-            }
-            const newNodes = produce(nodes, (draft) => {
-              draft[currentNodeIndex].data._runningStatus = NodeRunningStatus.Running
-            })
-            setNodes(newNodes)
-            const newEdges = produce(edges, (draft) => {
-              const edge = draft.find(edge => edge.target === data.node_id && edge.source === prevNodeId)
-
-              if (edge)
-                edge.data = { ...edge.data, _runned: true } as any
-            })
-            setEdges(newEdges)
-          }
           if (onNodeStarted)
             onNodeStarted(params)
         },
         onNodeFinished: (params) => {
-          const { data } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          const {
-            getNodes,
-            setNodes,
-          } = store.getState()
-          if (isInIteration) {
-            setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-              const tracing = draft.tracing!
-              const iterations = tracing[tracing.length - 1]
-              const currIteration = iterations.details![iterations.details!.length - 1]
-              const nodeInfo = currIteration[currIteration.length - 1]
+          handleWorkflowNodeFinished(params)
 
-              currIteration[currIteration.length - 1] = {
-                ...nodeInfo,
-                ...data,
-                status: NodeRunningStatus.Succeeded,
-              } as any
-            }))
-          }
-          else {
-            const nodes = getNodes()
-            setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-              const currentIndex = draft.tracing!.findIndex(trace => trace.node_id === data.node_id)
-
-              if (currentIndex > -1 && draft.tracing) {
-                draft.tracing[currentIndex] = {
-                  ...(draft.tracing[currentIndex].extras
-                    ? { extras: draft.tracing[currentIndex].extras }
-                    : {}),
-                  ...data,
-                } as any
-              }
-            }))
-
-            const newNodes = produce(nodes, (draft) => {
-              const currentNode = draft.find(node => node.id === data.node_id)!
-
-              currentNode.data._runningStatus = data.status as any
-            })
-            setNodes(newNodes)
-
-            prevNodeId = data.node_id
-          }
           if (onNodeFinished)
             onNodeFinished(params)
         },
         onIterationStart: (params) => {
-          const { data } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          const {
-            getNodes,
-            setNodes,
-            edges,
-            setEdges,
-            transform,
-          } = store.getState()
-          const nodes = getNodes()
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            draft.tracing!.push({
-              ...data,
-              status: NodeRunningStatus.Running,
-              details: [],
-            } as any)
-          }))
-          isInIteration = true
-          iterationLength = data.metadata.iterator_length
-
-          const {
-            setViewport,
-          } = reactflow
-          const currentNodeIndex = nodes.findIndex(node => node.id === data.node_id)
-          const currentNode = nodes[currentNodeIndex]
-          const position = currentNode.position
-          const zoom = transform[2]
-
-          if (!currentNode.parentId) {
-            setViewport({
-              x: (clientWidth - 400 - currentNode.width! * zoom) / 2 - position.x * zoom,
-              y: (clientHeight - currentNode.height! * zoom) / 2 - position.y * zoom,
-              zoom: transform[2],
-            })
-          }
-          const newNodes = produce(nodes, (draft) => {
-            draft[currentNodeIndex].data._runningStatus = NodeRunningStatus.Running
-            draft[currentNodeIndex].data._iterationLength = data.metadata.iterator_length
-          })
-          setNodes(newNodes)
-          const newEdges = produce(edges, (draft) => {
-            const edge = draft.find(edge => edge.target === data.node_id && edge.source === prevNodeId)
-
-            if (edge)
-              edge.data = { ...edge.data, _runned: true } as any
-          })
-          setEdges(newEdges)
+          handleWorkflowNodeIterationStarted(
+            params,
+            {
+              clientWidth,
+              clientHeight,
+            },
+          )
 
           if (onIterationStart)
             onIterationStart(params)
         },
         onIterationNext: (params) => {
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-
-          const { data } = params
-          const {
-            getNodes,
-            setNodes,
-          } = store.getState()
-
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            const iteration = draft.tracing![draft.tracing!.length - 1]
-            if (iteration.details!.length >= iterationLength)
-              return
-
-            iteration.details!.push([])
-          }))
-
-          const nodes = getNodes()
-          const newNodes = produce(nodes, (draft) => {
-            const currentNode = draft.find(node => node.id === data.node_id)!
-
-            currentNode.data._iterationIndex = data.index > 0 ? data.index : 1
-          })
-          setNodes(newNodes)
+          handleWorkflowNodeIterationNext(params)
 
           if (onIterationNext)
             onIterationNext(params)
         },
         onIterationFinish: (params) => {
-          const { data } = params
-
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          const {
-            getNodes,
-            setNodes,
-          } = store.getState()
-          const nodes = getNodes()
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            const tracing = draft.tracing!
-            tracing[tracing.length - 1] = {
-              ...tracing[tracing.length - 1],
-              ...data,
-              status: NodeRunningStatus.Succeeded,
-            } as any
-          }))
-          isInIteration = false
-
-          const newNodes = produce(nodes, (draft) => {
-            const currentNode = draft.find(node => node.id === data.node_id)!
-
-            currentNode.data._runningStatus = data.status
-          })
-          setNodes(newNodes)
-
-          prevNodeId = data.node_id
+          handleWorkflowNodeIterationFinished(params)
 
           if (onIterationFinish)
             onIterationFinish(params)
         },
+        onLoopStart: (params) => {
+          handleWorkflowNodeLoopStarted(
+            params,
+            {
+              clientWidth,
+              clientHeight,
+            },
+          )
+
+          if (onLoopStart)
+            onLoopStart(params)
+        },
+        onLoopNext: (params) => {
+          handleWorkflowNodeLoopNext(params)
+
+          if (onLoopNext)
+            onLoopNext(params)
+        },
+        onLoopFinish: (params) => {
+          handleWorkflowNodeLoopFinished(params)
+
+          if (onLoopFinish)
+            onLoopFinish(params)
+        },
+        onNodeRetry: (params) => {
+          handleWorkflowNodeRetry(params)
+
+          if (onNodeRetry)
+            onNodeRetry(params)
+        },
+        onAgentLog: (params) => {
+          handleWorkflowAgentLog(params)
+
+          if (onAgentLog)
+            onAgentLog(params)
+        },
         onTextChunk: (params) => {
-          const { data: { text } } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            draft.resultTabActive = true
-            draft.resultText += text
-          }))
+          handleWorkflowTextChunk(params)
         },
         onTextReplace: (params) => {
-          const { data: { text } } = params
-          const {
-            workflowRunningData,
-            setWorkflowRunningData,
-          } = workflowStore.getState()
-          setWorkflowRunningData(produce(workflowRunningData!, (draft) => {
-            draft.resultText = text
-          }))
+          handleWorkflowTextReplace(params)
         },
-        onTTSChunk: (messageId: string, audio: string, audioType?: string) => {
+        onTTSChunk: (messageId: string, audio: string) => {
           if (!audio || audio === '')
             return
           player.playAudioWithAudio(audio, true)
           AudioPlayerManager.getInstance().resetMsgId(messageId)
         },
-        onTTSEnd: (messageId: string, audio: string, audioType?: string) => {
+        onTTSEnd: (messageId: string, audio: string) => {
           player.playAudioWithAudio(audio, false)
         },
         ...restCallback,
       },
     )
-  }, [store, reactflow, workflowStore, doSyncWorkflowDraft])
+  }, [
+    store,
+    workflowStore,
+    doSyncWorkflowDraft,
+    handleWorkflowStarted,
+    handleWorkflowFinished,
+    handleWorkflowFailed,
+    handleWorkflowNodeStarted,
+    handleWorkflowNodeFinished,
+    handleWorkflowNodeIterationStarted,
+    handleWorkflowNodeIterationNext,
+    handleWorkflowNodeIterationFinished,
+    handleWorkflowNodeLoopStarted,
+    handleWorkflowNodeLoopNext,
+    handleWorkflowNodeLoopFinished,
+    handleWorkflowNodeRetry,
+    handleWorkflowTextChunk,
+    handleWorkflowTextReplace,
+    handleWorkflowAgentLog,
+    pathname],
+  )
 
   const handleStopRun = useCallback((taskId: string) => {
     const appId = useAppStore.getState().appDetail?.id
@@ -511,24 +318,32 @@ export const useWorkflowRun = () => {
     stopWorkflowRun(`/apps/${appId}/workflow-runs/tasks/${taskId}/stop`)
   }, [])
 
-  const handleRestoreFromPublishedWorkflow = useCallback(async () => {
-    const appDetail = useAppStore.getState().appDetail
-    const publishedWorkflow = await fetchPublishedWorkflow(`/apps/${appDetail?.id}/workflows/publish`)
-
-    if (publishedWorkflow) {
-      const nodes = publishedWorkflow.graph.nodes
-      const edges = publishedWorkflow.graph.edges
-      const viewport = publishedWorkflow.graph.viewport!
-
-      handleUpdateWorkflowCanvas({
-        nodes,
-        edges,
-        viewport,
-      })
-      featuresStore?.setState({ features: publishedWorkflow.features })
-      workflowStore.getState().setPublishedAt(publishedWorkflow.created_at)
-      workflowStore.getState().setEnvironmentVariables(publishedWorkflow.environment_variables || [])
+  const handleRestoreFromPublishedWorkflow = useCallback((publishedWorkflow: VersionHistory) => {
+    const nodes = publishedWorkflow.graph.nodes.map(node => ({ ...node, selected: false, data: { ...node.data, selected: false } }))
+    const edges = publishedWorkflow.graph.edges
+    const viewport = publishedWorkflow.graph.viewport!
+    handleUpdateWorkflowCanvas({
+      nodes,
+      edges,
+      viewport,
+    })
+    const mappedFeatures = {
+      opening: {
+        enabled: !!publishedWorkflow.features.opening_statement || !!publishedWorkflow.features.suggested_questions.length,
+        opening_statement: publishedWorkflow.features.opening_statement,
+        suggested_questions: publishedWorkflow.features.suggested_questions,
+      },
+      suggested: publishedWorkflow.features.suggested_questions_after_answer,
+      text2speech: publishedWorkflow.features.text_to_speech,
+      speech2text: publishedWorkflow.features.speech_to_text,
+      citation: publishedWorkflow.features.retriever_resource,
+      moderation: publishedWorkflow.features.sensitive_word_avoidance,
+      file: publishedWorkflow.features.file_upload,
     }
+
+    featuresStore?.setState({ features: mappedFeatures })
+    workflowStore.getState().setPublishedAt(publishedWorkflow.created_at)
+    workflowStore.getState().setEnvironmentVariables(publishedWorkflow.environment_variables || [])
   }, [featuresStore, handleUpdateWorkflowCanvas, workflowStore])
 
   return {

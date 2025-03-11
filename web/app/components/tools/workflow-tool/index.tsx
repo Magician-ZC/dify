@@ -2,13 +2,12 @@
 import type { FC } from 'react'
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  RiQuestionLine,
-} from '@remixicon/react'
 import produce from 'immer'
 import type { Emoji, WorkflowToolProviderParameter, WorkflowToolProviderRequest } from '../types'
 import cn from '@/utils/classnames'
 import Drawer from '@/app/components/base/drawer-plus'
+import Input from '@/app/components/base/input'
+import Textarea from '@/app/components/base/textarea'
 import Button from '@/app/components/base/button'
 import Toast from '@/app/components/base/toast'
 import EmojiPicker from '@/app/components/base/emoji-picker'
@@ -40,7 +39,7 @@ const WorkflowToolAsModal: FC<Props> = ({
 }) => {
   const { t } = useTranslation()
 
-  const [showEmojiPicker, setShowEmojiPicker] = useState<Boolean>(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false)
   const [emoji, setEmoji] = useState<Emoji>(payload.icon)
   const [label, setLabel] = useState<string>(payload.label)
   const [name, setName] = useState(payload.name)
@@ -125,18 +124,17 @@ const WorkflowToolAsModal: FC<Props> = ({
         panelClassName='mt-2 !w-[640px]'
         maxWidthClassName='!max-w-[640px]'
         height='calc(100vh - 16px)'
-        headerClassName='!border-b-black/5'
+        headerClassName='!border-b-divider'
         body={
           <div className='flex flex-col h-full'>
             <div className='grow h-0 overflow-y-auto px-6 py-3 space-y-4'>
               {/* name & icon */}
               <div>
-                <div className='py-2 leading-5 text-sm font-medium text-gray-900'>{t('tools.createTool.name')} <span className='ml-1 text-red-500'>*</span></div>
+                <div className='py-2 system-sm-medium text-text-primary'>{t('tools.createTool.name')} <span className='ml-1 text-red-500'>*</span></div>
                 <div className='flex items-center justify-between gap-3'>
-                  <AppIcon size='large' onClick={() => { setShowEmojiPicker(true) }} className='cursor-pointer' icon={emoji.content} background={emoji.background} />
-                  <input
-                    type='text'
-                    className='grow h-10 px-3 text-sm font-normal bg-gray-100 rounded-lg border border-transparent outline-none appearance-none caret-primary-600 placeholder:text-gray-400 hover:bg-gray-50 hover:border hover:border-gray-300 focus:bg-gray-50 focus:border focus:border-gray-300 focus:shadow-xs'
+                  <AppIcon size='large' onClick={() => { setShowEmojiPicker(true) }} className='cursor-pointer' iconType='emoji' icon={emoji.content} background={emoji.background} />
+                  <Input
+                    className='grow h-10'
                     placeholder={t('tools.createTool.toolNamePlaceHolder')!}
                     value={label}
                     onChange={e => setLabel(e.target.value)}
@@ -145,22 +143,18 @@ const WorkflowToolAsModal: FC<Props> = ({
               </div>
               {/* name for tool call */}
               <div>
-                <div className='flex items-center py-2 leading-5 text-sm font-medium text-gray-900'>
+                <div className='flex items-center py-2 system-sm-medium text-text-primary'>
                   {t('tools.createTool.nameForToolCall')} <span className='ml-1 text-red-500'>*</span>
                   <Tooltip
-                    htmlContent={
+                    popupContent={
                       <div className='w-[180px]'>
                         {t('tools.createTool.nameForToolCallPlaceHolder')}
                       </div>
                     }
-                    selector='workflow-tool-modal-tooltip'
-                  >
-                    <RiQuestionLine className='ml-2 w-[14px] h-[14px] text-gray-400' />
-                  </Tooltip>
+                  />
                 </div>
-                <input
-                  type='text'
-                  className='w-full h-10 px-3 text-sm font-normal bg-gray-100 rounded-lg border border-transparent outline-none appearance-none caret-primary-600 placeholder:text-gray-400 hover:bg-gray-50 hover:border hover:border-gray-300 focus:bg-gray-50 focus:border focus:border-gray-300 focus:shadow-xs'
+                <Input
+                  className='h-10'
                   placeholder={t('tools.createTool.nameForToolCallPlaceHolder')!}
                   value={name}
                   onChange={e => setName(e.target.value)}
@@ -171,9 +165,8 @@ const WorkflowToolAsModal: FC<Props> = ({
               </div>
               {/* description */}
               <div>
-                <div className='py-2 leading-5 text-sm font-medium text-gray-900'>{t('tools.createTool.description')}</div>
-                <textarea
-                  className='w-full h-10 px-3 py-2 text-sm font-normal bg-gray-100 rounded-lg border border-transparent outline-none appearance-none caret-primary-600 placeholder:text-gray-400 hover:bg-gray-50 hover:border hover:border-gray-300 focus:bg-gray-50 focus:border focus:border-gray-300 focus:shadow-xs h-[80px] resize-none'
+                <div className='py-2 system-sm-medium text-text-primary'>{t('tools.createTool.description')}</div>
+                <Textarea
                   placeholder={t('tools.createTool.descriptionPlaceholder') || ''}
                   value={description}
                   onChange={e => setDescription(e.target.value)}
@@ -181,11 +174,11 @@ const WorkflowToolAsModal: FC<Props> = ({
               </div>
               {/* Tool Input  */}
               <div>
-                <div className='py-2 leading-5 text-sm font-medium text-gray-900'>{t('tools.createTool.toolInput.title')}</div>
-                <div className='rounded-lg border border-gray-200 w-full overflow-x-auto'>
-                  <table className='w-full leading-[18px] text-xs text-gray-700 font-normal'>
-                    <thead className='text-gray-500 uppercase'>
-                      <tr className='border-b border-gray-200'>
+                <div className='py-2 system-sm-medium text-text-primary'>{t('tools.createTool.toolInput.title')}</div>
+                <div className='rounded-lg border border-divider-regular w-full overflow-x-auto'>
+                  <table className='w-full leading-[18px] text-xs text-text-secondary font-normal'>
+                    <thead className='text-text-tertiary uppercase'>
+                      <tr className='border-b border-divider-regular'>
                         <th className="p-2 pl-3 font-medium w-[156px]">{t('tools.createTool.toolInput.name')}</th>
                         <th className="p-2 pl-3 font-medium w-[102px]">{t('tools.createTool.toolInput.method')}</th>
                         <th className="p-2 pl-3 font-medium">{t('tools.createTool.toolInput.description')}</th>
@@ -193,22 +186,22 @@ const WorkflowToolAsModal: FC<Props> = ({
                     </thead>
                     <tbody>
                       {parameters.map((item, index) => (
-                        <tr key={index} className='border-b last:border-0 border-gray-200'>
+                        <tr key={index} className='border-b last:border-0 border-divider-regular'>
                           <td className="p-2 pl-3 max-w-[156px]">
                             <div className='text-[13px] leading-[18px]'>
                               <div title={item.name} className='flex'>
-                                <span className='font-medium text-gray-900 truncate'>{item.name}</span>
+                                <span className='font-medium text-text-primary truncate'>{item.name}</span>
                                 <span className='shrink-0 pl-1 text-[#ec4a0a] text-xs leading-[18px]'>{item.required ? t('tools.createTool.toolInput.required') : ''}</span>
                               </div>
-                              <div className='text-gray-500'>{item.type}</div>
+                              <div className='text-text-tertiary'>{item.type}</div>
                             </div>
                           </td>
                           <td>
                             {item.name === '__image' && (
                               <div className={cn(
-                                'flex items-center gap-1 min-h-[56px] px-3 py-2 h-9 bg-white cursor-default',
+                                'flex items-center gap-1 min-h-[56px] px-3 py-2 h-9 bg-transparent cursor-default',
                               )}>
-                                <div className={cn('grow text-[13px] leading-[18px] text-gray-700 truncate')}>
+                                <div className={cn('grow text-[13px] leading-[18px] text-text-secondary truncate')}>
                                   {t('tools.createTool.toolInput.methodParameter')}
                                 </div>
                               </div>
@@ -217,10 +210,10 @@ const WorkflowToolAsModal: FC<Props> = ({
                               <MethodSelector value={item.form} onChange={value => handleParameterChange('form', value, index)} />
                             )}
                           </td>
-                          <td className="p-2 pl-3 text-gray-500 w-[236px]">
+                          <td className="p-2 pl-3 text-text-tertiary w-[236px]">
                             <input
                               type='text'
-                              className='grow text-gray-700 text-[13px] leading-[18px] font-normal bg-white outline-none appearance-none caret-primary-600 placeholder:text-gray-300'
+                              className='w-full text-text-secondary text-[13px] leading-[18px] font-normal bg-transparent outline-none appearance-none caret-primary-600 placeholder:text-text-quaternary'
                               placeholder={t('tools.createTool.toolInput.descriptionPlaceholder')!}
                               value={item.description}
                               onChange={e => handleParameterChange('description', e.target.value, index)}
@@ -234,21 +227,22 @@ const WorkflowToolAsModal: FC<Props> = ({
               </div>
               {/* Tags */}
               <div>
-                <div className='py-2 leading-5 text-sm font-medium text-gray-900'>{t('tools.createTool.toolInput.label')}</div>
+                <div className='py-2 system-sm-medium text-text-primary'>{t('tools.createTool.toolInput.label')}</div>
                 <LabelSelector value={labels} onChange={handleLabelSelect} />
               </div>
               {/* Privacy Policy */}
               <div>
-                <div className='py-2 leading-5 text-sm font-medium text-gray-900'>{t('tools.createTool.privacyPolicy')}</div>
-                <input
+                <div className='py-2 system-sm-medium text-text-primary'>{t('tools.createTool.privacyPolicy')}</div>
+                <Input
+                  className='h-10'
                   value={privacyPolicy}
                   onChange={e => setPrivacyPolicy(e.target.value)}
-                  className='grow w-full h-10 px-3 text-sm font-normal bg-gray-100 rounded-lg border border-transparent outline-none appearance-none caret-primary-600 placeholder:text-gray-400 hover:bg-gray-50 hover:border hover:border-gray-300 focus:bg-gray-50 focus:border focus:border-gray-300 focus:shadow-xs' placeholder={t('tools.createTool.privacyPolicyPlaceholder') || ''} />
+                  placeholder={t('tools.createTool.privacyPolicyPlaceholder') || ''} />
               </div>
             </div>
-            <div className={cn((!isAdd && onRemove) ? 'justify-between' : 'justify-end', 'mt-2 shrink-0 flex py-4 px-6 rounded-b-[10px] bg-gray-50 border-t border-black/5')} >
+            <div className={cn((!isAdd && onRemove) ? 'justify-between' : 'justify-end', 'mt-2 shrink-0 flex py-4 px-6 rounded-b-[10px] bg-background-section-burn border-t border-divider-regular')} >
               {!isAdd && onRemove && (
-                <Button onClick={onRemove} className='text-red-500 border-red-50 hover:border-red-500'>{t('common.operation.delete')}</Button>
+                <Button variant='warning' onClick={onRemove}>{t('common.operation.delete')}</Button>
               )}
               <div className='flex space-x-2 '>
                 <Button onClick={onHide}>{t('common.operation.cancel')}</Button>

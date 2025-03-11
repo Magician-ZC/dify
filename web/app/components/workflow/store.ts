@@ -11,6 +11,7 @@ import type {
 } from './help-line/types'
 import type { VariableAssignerNodeType } from './nodes/variable-assigner/types'
 import type {
+  ConversationVariable,
   Edge,
   EnvironmentVariable,
   HistoryWorkflowData,
@@ -20,6 +21,25 @@ import type {
   WorkflowRunningData,
 } from './types'
 import { WorkflowContext } from './context'
+import type { NodeTracing, VersionHistory } from '@/types/workflow'
+
+// #TODO chatVar#
+// const MOCK_DATA = [
+//   {
+//     id: 'fjlaksdjflkjg-dfjlajfl0dnfkafjk-djfdkafj-djfak',
+//     name: 'chat_history',
+//     value_type: 'array[message]',
+//     value: [],
+//     description: 'The chat history of the conversation',
+//   },
+//   {
+//     id: 'fljdaklfjl-dfjlafj0-dklajglje-eknglh',
+//     name: 'order_id',
+//     value: '123456',
+//     value_type: 'string',
+//     description: '',
+//   },
+// ]
 
 type PreviewRunningData = WorkflowRunningData & {
   resultTabActive?: boolean
@@ -47,6 +67,10 @@ type Shape = {
   setDraftUpdatedAt: (draftUpdatedAt: number) => void
   publishedAt: number
   setPublishedAt: (publishedAt: number) => void
+  currentVersion: VersionHistory | null
+  setCurrentVersion: (currentVersion: VersionHistory) => void
+  showWorkflowVersionHistoryPanel: boolean
+  setShowWorkflowVersionHistoryPanel: (showWorkflowVersionHistoryPanel: boolean) => void
   showInputsPanel: boolean
   setShowInputsPanel: (showInputsPanel: boolean) => void
   inputs: Record<string, string>
@@ -80,8 +104,6 @@ type Shape = {
   setWorkflowTools: (tools: ToolWithProvider[]) => void
   clipboardElements: Node[]
   setClipboardElements: (clipboardElements: Node[]) => void
-  shortcutsDisabled: boolean
-  setShortcutsDisabled: (shortcutsDisabled: boolean) => void
   showDebugAndPreviewPanel: boolean
   setShowDebugAndPreviewPanel: (showDebugAndPreviewPanel: boolean) => void
   showEnvPanel: boolean
@@ -90,6 +112,12 @@ type Shape = {
   setEnvironmentVariables: (environmentVariables: EnvironmentVariable[]) => void
   envSecrets: Record<string, string>
   setEnvSecrets: (envSecrets: Record<string, string>) => void
+  showChatVariablePanel: boolean
+  setShowChatVariablePanel: (showChatVariablePanel: boolean) => void
+  showGlobalVariablePanel: boolean
+  setShowGlobalVariablePanel: (showGlobalVariablePanel: boolean) => void
+  conversationVariables: ConversationVariable[]
+  setConversationVariables: (conversationVariables: ConversationVariable[]) => void
   selection: null | { x1: number; y1: number; x2: number; y2: number }
   setSelection: (selection: Shape['selection']) => void
   bundleNodeSize: { width: number; height: number } | null
@@ -141,12 +169,28 @@ type Shape = {
   setControlPromptEditorRerenderKey: (controlPromptEditorRerenderKey: number) => void
   showImportDSLModal: boolean
   setShowImportDSLModal: (showImportDSLModal: boolean) => void
+  showTips: string
+  setShowTips: (showTips: string) => void
+  iterTimes: number
+  setIterTimes: (iterTimes: number) => void
+  loopTimes: number
+  setLoopTimes: (loopTimes: number) => void
+  iterParallelLogMap: Map<string, Map<string, NodeTracing[]>>
+  setIterParallelLogMap: (iterParallelLogMap: Map<string, Map<string, NodeTracing[]>>) => void
+  versionHistory: VersionHistory[]
+  setVersionHistory: (versionHistory: VersionHistory[]) => void
 }
 
 export const createWorkflowStore = () => {
+  const hideAllPanel = {
+    showDebugAndPreviewPanel: false,
+    showEnvPanel: false,
+    showChatVariablePanel: false,
+    showGlobalVariablePanel: false,
+  }
   return createStore<Shape>(set => ({
     appId: '',
-    panelWidth: localStorage.getItem('workflow-node-panel-width') ? parseFloat(localStorage.getItem('workflow-node-panel-width')!) : 420,
+    panelWidth: localStorage.getItem('workflow-node-panel-width') ? Number.parseFloat(localStorage.getItem('workflow-node-panel-width')!) : 420,
     showSingleRunPanel: false,
     setShowSingleRunPanel: showSingleRunPanel => set(() => ({ showSingleRunPanel })),
     workflowRunningData: undefined,
@@ -165,6 +209,10 @@ export const createWorkflowStore = () => {
     setDraftUpdatedAt: draftUpdatedAt => set(() => ({ draftUpdatedAt: draftUpdatedAt ? draftUpdatedAt * 1000 : 0 })),
     publishedAt: 0,
     setPublishedAt: publishedAt => set(() => ({ publishedAt: publishedAt ? publishedAt * 1000 : 0 })),
+    currentVersion: null,
+    setCurrentVersion: currentVersion => set(() => ({ currentVersion })),
+    showWorkflowVersionHistoryPanel: false,
+    setShowWorkflowVersionHistoryPanel: showWorkflowVersionHistoryPanel => set(() => ({ showWorkflowVersionHistoryPanel })),
     showInputsPanel: false,
     setShowInputsPanel: showInputsPanel => set(() => ({ showInputsPanel })),
     inputs: {},
@@ -194,8 +242,6 @@ export const createWorkflowStore = () => {
     setWorkflowTools: workflowTools => set(() => ({ workflowTools })),
     clipboardElements: [],
     setClipboardElements: clipboardElements => set(() => ({ clipboardElements })),
-    shortcutsDisabled: false,
-    setShortcutsDisabled: shortcutsDisabled => set(() => ({ shortcutsDisabled })),
     showDebugAndPreviewPanel: false,
     setShowDebugAndPreviewPanel: showDebugAndPreviewPanel => set(() => ({ showDebugAndPreviewPanel })),
     showEnvPanel: false,
@@ -204,6 +250,17 @@ export const createWorkflowStore = () => {
     setEnvironmentVariables: environmentVariables => set(() => ({ environmentVariables })),
     envSecrets: {},
     setEnvSecrets: envSecrets => set(() => ({ envSecrets })),
+    showChatVariablePanel: false,
+    setShowChatVariablePanel: showChatVariablePanel => set(() => ({ showChatVariablePanel })),
+    showGlobalVariablePanel: false,
+    setShowGlobalVariablePanel: showGlobalVariablePanel => set(() => {
+      if (showGlobalVariablePanel)
+        return { ...hideAllPanel, showGlobalVariablePanel: true }
+      else
+        return { showGlobalVariablePanel: false }
+    }),
+    conversationVariables: [],
+    setConversationVariables: conversationVariables => set(() => ({ conversationVariables })),
     selection: null,
     setSelection: selection => set(() => ({ selection })),
     bundleNodeSize: null,
@@ -239,6 +296,17 @@ export const createWorkflowStore = () => {
     setControlPromptEditorRerenderKey: controlPromptEditorRerenderKey => set(() => ({ controlPromptEditorRerenderKey })),
     showImportDSLModal: false,
     setShowImportDSLModal: showImportDSLModal => set(() => ({ showImportDSLModal })),
+    showTips: '',
+    setShowTips: showTips => set(() => ({ showTips })),
+    iterTimes: 1,
+    setIterTimes: iterTimes => set(() => ({ iterTimes })),
+    loopTimes: 1,
+    setLoopTimes: loopTimes => set(() => ({ loopTimes })),
+    iterParallelLogMap: new Map<string, Map<string, NodeTracing[]>>(),
+    setIterParallelLogMap: iterParallelLogMap => set(() => ({ iterParallelLogMap })),
+
+    versionHistory: [],
+    setVersionHistory: versionHistory => set(() => ({ versionHistory })),
   }))
 }
 
